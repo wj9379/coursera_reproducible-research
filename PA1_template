@@ -1,0 +1,86 @@
+#load data
+if (!file.exists("activity.csv") )
+{
+        dlurl <- 'http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip'  
+        download.file(dlurl,destfile='repdata%2Fdata%2Factivity.zip',mode='wb')  
+        unzip('repdata%2Fdata%2Factivity.zip')
+}
+
+
+x=read.csv('activity.csv')
+
+##Summarize data
+summary(x)
+head(x)
+str(x)
+x$date=as.Date(x$date)
+
+
+#Histogram of the total number of steps taken each day
+table(x$date)
+steps_day=aggregate(steps~date,x,sum)
+hist(steps_day$steps,main=paste('Total Number of Steps Taken Each Day'),col='blue',xlab='Number of Steps')
+
+##Mean and median number of steps taken each day
+mean1=mean(steps_day$steps)
+median1=median(steps_day$steps)
+
+
+#Time series plot of the average number of steps taken
+table(x$interval)
+steps_interval=aggregate(steps~interval,x,sum)
+plot(steps_interval$interval,steps_interval$steps,col='blue',type="l",xlab='Interval',ylab='Number of Steps',
+     main='Average Number of Steps Taken per Day by Interval')
+## the interval with most steps 
+max_interval=steps_interval[which.max(steps_interval$steps),1]
+max_interval
+
+
+
+#impute missing value
+library(VIM)
+summary(aggr(x,sortVar=TRUE))$combinations
+na=sum(!complete.cases(x))
+na
+
+## use mean for the day to impute missing values (do not forget to savle imputed value)
+steps_mean=aggregate(steps~interval,x,mean)
+steps_mean
+filled=numeric()
+for (i in 1:nrow(x)){
+        a=x[i,]
+        if(is.na(a$steps)){
+                a$steps=steps_mean[which(steps_mean$interval==a$interval),]$steps
+        }else{
+                a$steps=a$steps
+        }
+        filled=c(filled,a$steps)
+}
+
+## fill NA value with imputed value
+new_x=x
+new_x$steps=filled
+na=sum(!complete.cases(new_x))
+na
+
+##Histogram of the total number of steps taken each day with imputed dataset
+steps_day2=aggregate(steps~date,new_x,sum)
+hist(steps_day2$steps,main=paste('Total Number of Steps Taken Each Day'),col='yellow',xlab='Number of Steps')
+
+##Histogram to show difference
+hist(steps_day$steps, main = paste("Total Steps Each Day"), col="blue", xlab="Number of Steps", add=T)
+
+legend("topright", c("Imputed", "Non-imputed"), col=c("yellow", "blue"), lwd=10)
+
+mean2=mean(steps_day2$steps)
+median2=median(steps_day2$steps)
+mean_diff=mean2-mean1
+median_diff=median2-median1
+
+#Differences in acticity patterns btw weekdays and weekends
+weekdays <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+new_x$week = as.factor(ifelse(is.element(weekdays(as.Date(new_x$date)),weekdays), "Weekday", "Weekend"))
+new_x2<- aggregate(steps ~ interval + week, new_x, mean)
+library(lattice)
+xyplot(new_x2$steps ~ new_x2$interval|new_x2$week, main="Average Steps per Day by Interval",xlab="Interval", ylab="Steps",layout=c(1,2), type="l")
+
